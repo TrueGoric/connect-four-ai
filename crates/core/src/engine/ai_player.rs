@@ -5,12 +5,12 @@
 //! a softmax distribution over the scores of each move in the position. This allows for a range
 //! of behaviours, from a more random 'Easy' player to a perfect, greedy 'Impossible' player.
 
+use crate::{Position, Solver};
+use rand::distr::weighted::WeightedIndex;
+use rand::distr::Distribution;
+use rand::rng;
 use std::cmp::Ordering;
 use std::path::Path;
-use rand::distr::weighted::WeightedIndex;
-use rand::{rng};
-use rand::distr::Distribution;
-use crate::{Position, Solver};
 
 /// An enum to represent the difficulty of an AI player.
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
@@ -52,6 +52,12 @@ impl AIPlayer {
         }
     }
 
+    pub fn create(mut solver: Solver, difficulty: Difficulty) -> AIPlayer {
+        solver.reset();
+
+        AIPlayer { solver, difficulty }
+    }
+
     /// Attempts to load an opening book from the given path for the AI player's solver.
     ///
     /// Returns whether the opening book was successfully loaded.
@@ -87,7 +93,11 @@ impl AIPlayer {
     ///
     /// Returns an `Option<usize>` containing the column index of the selected move, or `None`
     /// if no moves are possible.
-    pub fn select_move(&self, position: &Position, scores: &[Option<i8>; Position::WIDTH]) -> Option<usize> {
+    pub fn select_move(
+        &self,
+        position: &Position,
+        scores: &[Option<i8>; Position::WIDTH],
+    ) -> Option<usize> {
         let normalised_scores = Self::normalise_scores(position, scores);
         let possible_moves: Vec<(usize, f64)> = normalised_scores
             .iter()
@@ -97,7 +107,7 @@ impl AIPlayer {
 
         // Returns `None` if no possible moves could be found
         if possible_moves.is_empty() {
-            return None
+            return None;
         }
 
         // Greedily selects the optimal move if the temperatures is zero or less
@@ -128,9 +138,13 @@ impl AIPlayer {
 
     /// Normalises scores from the given position to lie in the range -1 to 1, scaled by the maximum
     /// possible score.
-    fn normalise_scores(position: &Position, scores: &[Option<i8>; Position::WIDTH]) -> [Option<f64>; Position::WIDTH] {
+    fn normalise_scores(
+        position: &Position,
+        scores: &[Option<i8>; Position::WIDTH],
+    ) -> [Option<f64>; Position::WIDTH] {
         let mut normalised_scores = [None; Position::WIDTH];
-        let max_possible_score = ((Position::BOARD_SIZE + 1 - position.get_moves()) as i8 / 2) as f64;
+        let max_possible_score =
+            ((Position::BOARD_SIZE + 1 - position.get_moves()) as i8 / 2) as f64;
 
         if max_possible_score <= 0.0 {
             return normalised_scores;
@@ -144,3 +158,4 @@ impl AIPlayer {
         normalised_scores
     }
 }
+
