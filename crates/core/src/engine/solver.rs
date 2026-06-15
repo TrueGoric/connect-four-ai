@@ -1,7 +1,7 @@
 //! Provides the core solving logic for the Connect Four AI.
 
 use crate::{MoveSorter, OpeningBook, Position, TTFlag, TranspositionTable};
-use std::path::Path;
+use std::{path::Path, sync::Arc};
 
 // This line embeds a book file directly into the program's binary
 // The path is relative to the current source file (solver.rs)
@@ -24,9 +24,8 @@ pub struct Solver {
     pub transposition_table: TranspositionTable,
 
     /// The opening book for instant lookups of early-game positions.
-    pub opening_book: Option<OpeningBook>,
+    pub opening_book: Option<Arc<OpeningBook>>,
 }
-
 
 impl Solver {
     /// A pre-sorted list of columns to check, starting from the centre column.
@@ -34,7 +33,8 @@ impl Solver {
         let mut columns = [0; Position::WIDTH];
         let mut i = 0;
         while i < Position::WIDTH {
-            columns[i] = (Position::WIDTH as i32 / 2 + (1 - 2 * (i as i32 % 2)) * (i as i32 + 1) / 2) as usize;
+            columns[i] = (Position::WIDTH as i32 / 2
+                + (1 - 2 * (i as i32 % 2)) * (i as i32 + 1) / 2) as usize;
             i += 1;
         }
         columns
@@ -50,7 +50,7 @@ impl Solver {
         Solver {
             explored_positions: 0,
             transposition_table: TranspositionTable::new(),
-            opening_book: None
+            opening_book: None,
         }
     }
 
@@ -58,7 +58,7 @@ impl Solver {
     ///
     /// Returns whether the opening book was successfully loaded.
     pub fn load_opening_book(&mut self, path: &Path) -> bool {
-        self.opening_book = OpeningBook::load(path).ok();
+        self.opening_book = OpeningBook::load(path).ok().map(Arc::new);
         self.opening_book.is_some()
     }
 
@@ -92,13 +92,17 @@ impl Solver {
         self.explored_positions = 0;
 
         // Before starting the search, checks if the answer is in the opening book
-        if let Some(score) = self.opening_book.as_ref().and_then(|book| book.get(position)) {
+        if let Some(score) = self
+            .opening_book
+            .as_ref()
+            .and_then(|book| book.get(position))
+        {
             return score;
         }
 
         // Checks if the player can win in one move, as negamax does not support this case
         if position.can_win_next() {
-            return (Position::BOARD_SIZE + 1 - position.get_moves()) as i8 / 2
+            return (Position::BOARD_SIZE + 1 - position.get_moves()) as i8 / 2;
         }
 
         // Initial search window is the widest possible score range
@@ -115,7 +119,12 @@ impl Solver {
             }
 
             // Performs a null-window search to test if the score is greater than the midpoint
-            let score = self.negamax(position, (Position::BOARD_SIZE - position.get_moves()) as u8, mid, mid + 1);
+            let score = self.negamax(
+                position,
+                (Position::BOARD_SIZE - position.get_moves()) as u8,
+                mid,
+                mid + 1,
+            );
 
             // Adjusts the search window based on the result
             if score <= mid {
@@ -195,14 +204,18 @@ impl Solver {
         // Tightens the lower bound as the opponent cannot win next move
         let min = -((Position::BOARD_SIZE - position.get_moves()) as i8 - 2) / 2;
         if alpha < min {
-            if min >= beta { return min }
+            if min >= beta {
+                return min;
+            }
             alpha = min;
         }
 
         // Tightens the upper bound as we cannot win immediately
         let max = ((Position::BOARD_SIZE - position.get_moves()) as i8 - 1) / 2;
         if beta > max {
-            if alpha >= max { return max }
+            if alpha >= max {
+                return max;
+            }
             beta = max;
         }
 
@@ -250,7 +263,10 @@ impl Default for Solver {
         Solver {
             explored_positions: 0,
             transposition_table: TranspositionTable::new(),
-            opening_book: OpeningBook::from_static_bytes(OPENING_BOOK_BYTES).ok()
+            opening_book: OpeningBook::from_static_bytes(OPENING_BOOK_BYTES)
+                .ok()
+                .map(Arc::new),
         }
     }
 }
+
