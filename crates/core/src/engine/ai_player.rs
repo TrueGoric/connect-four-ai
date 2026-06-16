@@ -52,10 +52,16 @@ impl AIPlayer {
         }
     }
 
+    /// Creates a new AI player with a given solver and difficulty
     pub fn create(mut solver: Solver, difficulty: Difficulty) -> AIPlayer {
         solver.reset();
 
         AIPlayer { solver, difficulty }
+    }
+
+    /// Sets AI player difficulty
+    pub fn set_difficulty(&mut self, difficulty: Difficulty) {
+        self.difficulty = difficulty;
     }
 
     /// Attempts to load an opening book from the given path for the AI player's solver.
@@ -158,4 +164,3 @@ impl AIPlayer {
         normalised_scores
     }
 }
-
